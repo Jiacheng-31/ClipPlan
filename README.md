@@ -16,7 +16,7 @@ Retrieve and globally rank temporal clips from large video corpora under a share
 
 ClipPlan builds context, entity, and action indices, retrieves a compact candidate pool with reciprocal-rank fusion, and uses a learned `DROP / TEXT / VISUAL` router before Qianfan-based temporal localization and relevance scoring.
 
-The repository contains source code and configuration only. It does not include datasets, model weights, retrieval indices, API credentials, checkpoints, caches, logs, or paper results.
+The paper's online appendix is available as [appendix.pdf](appendix.pdf). Apart from the appendix, the repository contains source code and configuration only. It does not include datasets, model weights, retrieval indices, API credentials, checkpoints, caches, logs, or raw experiment outputs.
 
 <p align="center">
   <img src="docs/assets/intro.png" alt="ClipPlan motivation: adaptive text and visual processing for video queries" width="850">
@@ -33,7 +33,7 @@ The repository contains source code and configuration only. It does not include 
 1. Normalize query and temporal relevance annotations.
 2. Extract frames at the paper default interval of 2 seconds.
 3. Build context, entity, and action HNSW indices.
-4. Fuse the three rankings with RRF and retain the top 60 videos.
+4. Fuse the three rankings with RRF and keep a query-dependent cutoff `H_q` of at most `H_0=20` videos.
 5. Train the Qwen3-VL router with counterfactual PPO.
 6. Route frames under 40% of Full-Visual input tokens.
 7. Use ERNIE through Qianfan to localize clips and assign relevance scores.
@@ -122,7 +122,7 @@ ENTITY_PROPOSALS=data/qvh/sam2_proposals.json \
 bash scripts/build_retrieval_index.sh
 ```
 
-Retrieve and fuse candidates with `kappa=60` and `H=60`:
+Retrieve and fuse candidates with `kappa=60`. The script keeps a fixed pool (`--top-h 60`); the paper uses a query-dependent cutoff `H_q` of at most `H_0=20`:
 
 ```bash
 INDEX_DIR=indices/qvh \
@@ -151,16 +151,17 @@ The training entry point consumes [configs/router_train.yaml](configs/router_tra
 |---|---:|---|
 | Actor | Qwen3-VL-2B-Instruct | Paper |
 | Actions | DROP, TEXT, VISUAL | Paper |
-| Candidate pool | 60 videos | Paper |
+| Training queries | 500 TVR-Ranking validation queries | Paper |
+| Candidate pool | Query-dependent `H_q`, at most 20 videos | Paper |
 | Global online budget | 40% of Full-Visual input tokens | Paper |
-| Optimizer | AdamW | Implementation default |
-| Actor learning rate | 1e-6 | Implementation default |
+| Optimizer | AdamW | Paper |
+| Actor learning rate | 1e-5 | Paper |
 | Critic learning rate | 1e-4 | Implementation default |
 | Critic | 22 -> 128 -> 128 -> 3, SiLU | Implementation default |
 | PPO clipping epsilon | 0.2 | Paper |
 | Counterfactual selection rate | 0.12 | Paper |
 | Continuations per feasible action | 1 | Paper |
-| Training steps | 1000 | Implementation default |
+| Training steps | 1000 | Paper |
 
 Start single-process training:
 
@@ -200,7 +201,7 @@ ANNOTATIONS=data/qvh/annotations/test.json \
 bash scripts/evaluate.sh
 ```
 
-Use `--k` and `--iou-threshold` to reproduce NDCG@5/10/20 and IoU thresholds 0.3/0.5/0.7.
+Use `--k 5` or `--k 20` to reproduce NDCG@5 and NDCG@20 reported in the appendix.
 
 ## 📁 Repository scope
 
